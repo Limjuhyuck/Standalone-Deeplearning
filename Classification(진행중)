@@ -1,0 +1,42 @@
+""""Classification"""""
+
+import numpy as np
+import matplotlib.pyplot as plt
+
+"""""Generating Dataset"""""
+# 분포가 원형으로 나뉘기 때문에 r과 theta를 먼저 sampling
+r = np.random.rand(10000)*3  # random으로 10000개의 r
+theta = np.random.rand(10000)*2*np.pi  # random으로 다양한 각도에서 10000개의 theta
+y = r.astype(int) # r을 정수형으로 변환해주는 numpy 문법 -> y class : 정수형으로 라벨링된 data set이 된다.
+r = r * (np.cos(theta) + 1)
+x1 = r * np.cos(theta)
+x2 = r * np.sin(theta)
+X = np.array([x1, x2]).T # x1+x2를 하고 T를 해서 10000*2차원
+
+
+"""""Split Dataset : Train, Validation, Test"""""
+train_X, train_y = X[:8000, :], y[:8000]   # 처음 8000개 : training set
+val_X, val_y = X[8000:9000, :], y[8000:9000]  # 8000개에서 9000개까지 : validation set
+test_X, test_y = X[9000:, :], y[9000:]  # 9000개에서 10000개까지 : test set
+# 8 : 1: 1 로 dataset 나눴음
+
+"""""Visualize Each Dataset"""""
+fig = plt.figure(figsize=(15,5))
+ax1 = fig.add_subplot(1, 3, 1)
+ax1.scatter(train_X[:, 0], train_X[:, 1], c=train_y, s=0.7) # c=train_y : 서로 다른 각각의 class 를
+ax1.set_ylabel('x2')                                        # 각각의 색깔로 표현하기 위해 사용 , s는 점 사이즈
+ax1.set_title('Train Set Distribution')
+
+ax2 = fig.add_subplot(1, 3, 2)
+ax2.scatter(val_X[:, 0], val_X[:, 1], c=val_y)
+ax2.set_xlabel('x1')
+ax2.set_ylabel('x2')
+ax2.set_title('Validation Set Distribution')
+
+ax3 = fig.add_subplot(1, 3, 3)
+ax3.scatter(test_X[:, 0], test_X[:, 1], c=test_y)
+ax3.set_xlabel('x1')
+ax3.set_ylabel('x2')
+ax3.set_title('Test Set Distribution')
+
+plt.show()
