@@ -40,3 +40,160 @@ ax3.set_ylabel('x2')
 ax3.set_title('Test Set Distribution')
 
 plt.show()
+
+
+"""""Hypothesis(Model Define)"""""
+import torch
+import torch.nn as nn
+
+
+# class LinearModel(nn.Module):
+#     def __init__(self):
+#         super(LinearModel, self).__init__()   # Class 생성하는 문법
+#         self.linear = nn.Linear(in_features=2, out_features=3, bias=True) # 2차원에서 3차원으로 linear transformation
+#         # self.softmax = nn.Softmax() -> 굳이 없어도 된다.
+#
+#     def forward(self, x):
+#         x = self.linear(x)
+#         # x = self.softmax(x)
+#         return x
+# softmax를 취하는 게 regression과 classification의 차이
+
+class MLPModel(nn.Module):
+    def __init__(self):
+        super(MLPModel, self).__init__()
+        self.linear1 = nn.Linear(in_features=2, out_features=200)
+        self.linear2 = nn.Linear(in_features=200, out_features=3)
+        self.relu = nn.ReLU()
+
+    def forward(self, x):
+        x = self.linear1(x)
+        x = self.relu(x)   #activation function
+        x = self.linear2(x)
+        return x
+
+"""""Cost Function Define(Loss Function)"""""
+cls_loss = nn.CrossEntropyLoss()  # multi label 이기 때문에 crossentropyloss 사용 / 이전에는 MSE 사용했음
+
+# crossentropy test
+test_pred_y = torch.Tensor([[2,0.1],[0,1]]) # 2x2
+test_true_y1 = torch.Tensor([1,0]).long()  # true 값은 정수형 타입이어야해서 .long() 사용
+test_true_y2 = torch.Tensor([0,1]).long()
+
+print(cls_loss(test_pred_y, test_true_y1))
+print(cls_loss(test_pred_y, test_true_y2))
+
+"""""Training & Evaluation"""""
+import torch.optim as optim
+from sklearn.metrics import accuracy_score
+# 완벽하게 맞는 경우만 정답이라고 인정. (근접하더라도 정확하지 않으면 정답으로 인정 x)
+
+# Construct Model
+#model = LinearModel()  # linear model
+model = MLPModel()
+print('{} parameters'.format(
+    sum(p.numel() for p in model.parameters() if p.requires_grad)))  # 모델 내에 학습을 당할 파라미터 수를 카운팅하는 코드
+
+# Construct Optimizer
+lr = 0.005  # Learning Rate지 정
+optimizer = optim.SGD(model.parameters(), lr=lr)  # Optimizer 생성
+
+# 매 학습 단계에서 epcoch값과 그 때 loss 값을 저장할 리스트
+list_epoch = []
+list_train_loss = []
+list_val_loss = []
+list_acc = []
+list_acc_epoch = []
+
+epoch = 4000  # 학습 횟수(epoch)을 지정
+for i in range(epoch):
+
+    # Training
+    model.train()  # model을 train 모드로 세팅 / model 평가할 때는 eval() 사용
+    optimizer.zero_grad()  # optimizer에 남아있을 수도 있는 잔여 gradient를 0으로 다 초기화
+
+    input_x = torch.Tensor(train_X)
+    true_y = torch.Tensor(train_y).long() # crossentropy에 들어갈 true_y 니까 long()을 사용해서 정수형으로.
+    pred_y = model(input_x) # input_x로 pred_y 만들기
+    print(input_x.shape, true_y.shape, pred_y.shape)  # input, output 차원 체크
+
+    loss = cls_loss(pred_y.squeeze(), true_y) # squeeze : 차원의 원소가 1인 차원을 없애준다.
+    loss.backward()  # backward()를 통해서 gradient 계산
+    optimizer.step()  # step()을 사용해 gradient를 바탕으로 parameter update
+    list_epoch.append(i)
+    list_train_loss.append(loss.detach().numpy())
+
+    # Validation
+    model.eval()
+    optimizer.zero_grad()
+    input_x = torch.Tensor(val_X)
+    true_y = torch.Tensor(val_y).long()
+    pred_y = model(input_x)
+    loss = cls_loss(pred_y.squeeze(), true_y)
+    list_val_loss.append(loss.detach().numpy())
+
+    # Evaluation
+    if i % 200 == 0:  # 200회의 학습마다 실제 데이터 분포와 모델이 예측한 분포를 시각화
+
+        # Calculate Accuracy
+        model.eval()
+        optimizer.zero_grad()
+        input_x = torch.Tensor(test_X)
+        true_y = torch.Tensor(test_y)
+        pred_y = model(input_x).detach().max(dim=1)[1].numpy()
+        acc = accuracy_score(true_y, pred_y)  # *주의* sklearn 쪽 함수들은 true_y 가 먼저, pred_y가 나중에 들어감.
+        list_acc.append(acc)
+        list_acc_epoch.append(i)
+
+        fig = plt.figure(figsize=(15, 5))
+
+        # True Y Scattering
+        ax1 = fig.add_subplot(1, 3, 1)
+        ax1.scatter(test_X[:, 0], test_X[:, 1], c=test_y)
+        ax1.set_xlabel('x1')
+        ax1.set_ylabel('x2')
+        ax1.set_title('True test y')
+
+        # Predicted Y Scattering
+        ax2 = fig.add_subplot(1, 3, 2)
+        ax2.scatter(test_X[:, 0], test_X[:, 1], c=pred_y)
+        ax2.set_xlabel('x1')
+        ax2.set_ylabel('x2')
+        ax2.set_title('Predicted test y')
+
+        # Just for Visualizaing with High Resolution
+        input_x = torch.Tensor(train_X)
+        pred_y = model(input_x).detach().max(dim=1)[1].numpy()
+
+        ax3 = fig.add_subplot(1, 3, 3)
+        ax3.scatter(train_X[:, 0], train_X[:, 1], c=pred_y)
+        ax3.set_xlabel('x1')
+        ax3.set_ylabel('x2')
+        ax3.set_title('Prediction on train set')
+
+        plt.show()
+        print('Epoch: ', i, 'Accuracy: ', acc * 100, '%')
+
+fig = plt.figure(figsize=(15,5))
+
+"""""train_loss & val_loss"""""
+# Loss Fluctuation
+ax1 = fig.add_subplot(1, 2, 1)
+ax1.plot(list_epoch, list_train_loss, label='train_loss')
+ax1.plot(list_epoch, list_val_loss, '--', label='val_loss')
+ax1.set_xlabel('epoch')
+ax1.set_ylabel('loss')
+ax1.grid()
+ax1.legend()
+ax1.set_title('epoch vs loss')
+
+# Metric Fluctuation
+ax2 = fig.add_subplot(1, 2, 2)
+ax2.plot(list_acc_epoch, list_acc, marker='x', label='Accuracy metric')
+ax2.set_xlabel('epoch')
+ax2.set_ylabel('Acc')
+ax2.grid()
+ax2.legend()
+ax2.set_title('epoch vs Accuracy')
+
+plt.show()
